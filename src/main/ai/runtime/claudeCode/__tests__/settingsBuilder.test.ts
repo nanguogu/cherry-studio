@@ -158,9 +158,12 @@ vi.mock('../ToolApprovalRegistry', () => ({
   }
 }))
 
-const { buildClaudeCodeSessionSettings, disposeToolPolicySnapshot, redactProxyUrlForAssistantContext } = await import(
-  '../settingsBuilder'
-)
+const {
+  buildClaudeCodeSessionSettings,
+  clearNetworkProbeCache,
+  disposeToolPolicySnapshot,
+  redactProxyUrlForAssistantContext
+} = await import('../settingsBuilder')
 
 describe('redactProxyUrlForAssistantContext', () => {
   it('redacts proxy credentials while keeping the host and port visible', () => {
@@ -182,6 +185,8 @@ describe('buildClaudeCodeSessionSettings', () => {
     // The per-session snapshot registry is module-level state; reset session-1 (reused across
     // tests) so each build creates a fresh snapshot instead of refreshing a prior test's instance.
     disposeToolPolicySnapshot('session-1')
+    // The network-probe memo is module-level too — clear it so probe assertions are order-independent.
+    clearNetworkProbeCache()
     mocks.resolveRequire.mockImplementation((specifier: string) => {
       if (specifier === '@anthropic-ai/claude-agent-sdk') return '/sdk/index.js'
       return `/native/${specifier}/claude`
@@ -762,6 +767,44 @@ describe('buildClaudeCodeSessionSettings', () => {
 
     expect(settings.systemPrompt).toContain('- Proxy: proxy.example:8080')
     expect(settings.systemPrompt).not.toContain('pass')
+  })
+
+  it('memoizes network probes across assistant builds within the TTL', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      mocks.applicationGet.mockImplementation((name: string) => {
+        if (name === 'PreferenceService') return { get: vi.fn() }
+        if (name === 'McpCatalogService') return { listTools: vi.fn(async () => []) }
+        throw new Error(`Unexpected application.get(${name})`)
+      })
+      mocks.getAgent.mockReturnValue({
+        id: 'agent-1',
+        type: 'claude-code',
+        model: 'anthropic::claude-sonnet',
+        mcps: [],
+        allowedTools: [],
+        disabledTools: [],
+        configuration: { builtin_role: 'assistant' }
+      })
+      const session = {
+        id: 'session-1',
+        agentId: 'agent-1',
+        workspace: { type: 'user', path: '/workspace/project' }
+      }
+
+      // A probe flap between two builds would flip `reachable`↔`unreachable` in the systemPrompt and
+      // spuriously invalidate the warm/staleness signatures — the memo pins the result for the TTL.
+      const first = await buildClaudeCodeSessionSettings(session as never, {} as never)
+      const probeCallsAfterFirst = fetchMock.mock.calls.length
+      const second = await buildClaudeCodeSessionSettings(session as never, {} as never)
+
+      expect(probeCallsAfterFirst).toBe(3)
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+      expect(second.systemPrompt).toBe(first.systemPrompt)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   // Warm-pool correctness: hooks baked at prewarm must resolve session state by id at fire-time, so

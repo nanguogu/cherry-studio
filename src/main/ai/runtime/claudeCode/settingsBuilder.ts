@@ -243,7 +243,27 @@ export function formatNetworkProbeLine(v: { host: string; ok: boolean }): string
   return `- ${v.host}: ${v.ok ? 'reachable' : 'unreachable'}`
 }
 
-async function probeHost(host: string): Promise<{ host: string; ok: boolean }> {
+// Memoized per host: the 2s-capped probes sit on every assistant-session settings build, and a
+// transient flap flipping `reachable`↔`unreachable` would change the systemPrompt and thus the
+// warm/staleness signatures — respawning the subprocess for nothing.
+// ponytail: 5-min TTL — offline transitions surface in the prompt up to 5 min late
+const PROBE_TTL_MS = 5 * 60 * 1000
+const probeCache = new Map<string, { promise: Promise<{ host: string; ok: boolean }>; expiresAt: number }>()
+
+/** Module-level cache escape hatch for tests (mirrors `disposeToolPolicySnapshot`). */
+export function clearNetworkProbeCache(): void {
+  probeCache.clear()
+}
+
+function probeHost(host: string): Promise<{ host: string; ok: boolean }> {
+  const cached = probeCache.get(host)
+  if (cached && cached.expiresAt > Date.now()) return cached.promise
+  const promise = probeHostUncached(host)
+  probeCache.set(host, { promise, expiresAt: Date.now() + PROBE_TTL_MS })
+  return promise
+}
+
+async function probeHostUncached(host: string): Promise<{ host: string; ok: boolean }> {
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 2000)
