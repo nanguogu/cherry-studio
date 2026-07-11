@@ -179,7 +179,8 @@ class ClaudeCodeRuntimeConnection implements AgentRuntimeConnection {
       : await application.get('ClaudeCodeWarmQueryManager').consume({
           key: request.key,
           options,
-          initializeTimeoutMs: request.initializeTimeoutMs
+          initializeTimeoutMs: request.initializeTimeoutMs,
+          credentialsFingerprint: request.credentialsFingerprint
         })
 
     this.query = warmQuery
