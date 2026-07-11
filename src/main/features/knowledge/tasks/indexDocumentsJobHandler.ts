@@ -389,12 +389,8 @@ function lingerEmbeddingProgress(itemId: string): void {
   if (current === undefined) {
     return
   }
-  // Delete-then-set rather than a plain re-set: setShared skips the cross-window
-  // broadcast when the value is unchanged (a TTL-only refresh is silent), so a
-  // bare re-set would apply the TTL to main's copy only, leaving every renderer
-  // mirror holding the value TTL-free for the rest of the session. The deletion
-  // resets the equality baseline, so the follow-up write broadcasts the value
-  // WITH its absolute expiry, which renderer mirrors store and expire on their own.
-  cacheService.deleteShared(progressKey)
+  // A same-value write with a new TTL still reaches renderer mirrors (setShared
+  // broadcasts TTL-only changes with the absolute expiry), and the main-side GC
+  // broadcasts the eventual expiry deletion, so a single write is enough.
   cacheService.setShared(progressKey, current, EMBEDDING_PROGRESS_LINGER_TTL_MS)
 }

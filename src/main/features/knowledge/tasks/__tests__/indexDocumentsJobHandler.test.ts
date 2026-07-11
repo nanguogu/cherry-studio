@@ -165,10 +165,10 @@ describe('index-documents job handler', () => {
       ]
     expect(deleteSharedInvocationOrder).toBeLessThan(firstProgressInvocationOrder)
     // The value must outlive the job — the list status is polled, so a completion
-    // that removed the key would blank the percentage until the next poll. The
-    // exit path re-publishes the final value (delete-then-set, so the TTL'd write
-    // actually broadcasts to renderer mirrors instead of being skipped as a
-    // same-value refresh), landing only after the item flips to 'completed'.
+    // that removed the key would blank the percentage until the next poll. The exit
+    // path is a single same-value TTL'd write (setShared broadcasts TTL-only
+    // changes; no deletion event that could flicker a mounted badge), landing only
+    // after the item flips to 'completed'.
     expect(cacheService.getShared(progressKey)).toBe(100)
     const completedCallOrder = knowledgeItemUpdateStatusMock.mock.calls.findIndex(
       ([, status]) => status === 'completed'
@@ -177,15 +177,9 @@ describe('index-documents job handler', () => {
     const lingerCallIndex = cacheService.setShared.mock.calls.lastIndexOf(progressCalls.at(-1)!)
     const lingerInvocationOrder = cacheService.setShared.mock.invocationCallOrder[lingerCallIndex]
     expect(lingerInvocationOrder).toBeGreaterThan(completedInvocationOrder)
-    // The linger's baseline-resetting delete sits between 'completed' and the final
-    // TTL'd write — a delete AFTER the write would wipe the value it just published.
-    const lingerDeleteCallOrder = cacheService.deleteShared.mock.calls
-      .map(([key], index) => (key === progressKey ? index : -1))
-      .filter((index) => index >= 0)
-      .at(-1)!
-    const lingerDeleteInvocationOrder = cacheService.deleteShared.mock.invocationCallOrder[lingerDeleteCallOrder]
-    expect(lingerDeleteInvocationOrder).toBeGreaterThan(completedInvocationOrder)
-    expect(lingerDeleteInvocationOrder).toBeLessThan(lingerInvocationOrder)
+    // Exactly one deletion for the key across the whole run — the run-start stale
+    // clear. The exit path must not delete (a deletion event blanks the badge).
+    expect(cacheService.deleteShared.mock.calls.filter(([key]) => key === progressKey)).toHaveLength(1)
   })
 
   it('stops embedding more batches once the job is aborted mid-loop', async () => {
