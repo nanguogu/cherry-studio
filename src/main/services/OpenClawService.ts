@@ -139,6 +139,7 @@ export class OpenClawService extends BaseService {
   }
 
   protected async onStop(): Promise<void> {
+    if (this.gatewayStatus === 'stopped') return
     await this.stopGateway()
   }
 
@@ -198,7 +199,6 @@ export class OpenClawService extends BaseService {
         message: 'OpenClaw binary not found. Please install OpenClaw first.'
       }
     }
-
     this.gatewayStatus = 'starting'
 
     try {
