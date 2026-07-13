@@ -39,7 +39,7 @@ import { type Topic, TopicType, type TopicType as TopicTypeEnum } from '@rendere
 import { buildAgentSessionTopicId } from '@renderer/utils/agentSession'
 import { resolveInlineFilePath } from '@renderer/utils/filePath'
 import { cn } from '@renderer/utils/style'
-import type { CherryMessagePart, CherryUIMessage, ModelSnapshot } from '@shared/data/types/message'
+import type { CherryMessagePart, CherryUIMessage } from '@shared/data/types/message'
 import {
   Activity,
   Bot,
@@ -101,7 +101,6 @@ interface AgentRightPaneMeta {
   agentId?: string
   agentName?: string
   agentAvatar?: string
-  modelFallback?: ModelSnapshot
   filesEnabled?: boolean
   statusEnabled?: boolean
 }
@@ -185,7 +184,6 @@ function AgentRightPaneStateProvider({
   agentName,
   agentAvatar,
   filesEnabled = true,
-  modelFallback,
   statusEnabled = true
 }: AgentRightPaneProviderProps) {
   const { activeTab, open } = useShellActivityState()
@@ -341,7 +339,6 @@ function AgentRightPaneStateProvider({
         agentName,
         agentAvatar,
         filesEnabled,
-        modelFallback,
         statusEnabled
       }
     }),
@@ -357,7 +354,6 @@ function AgentRightPaneStateProvider({
       filesEnabled,
       flow,
       flowTabs,
-      modelFallback,
       openArtifactFile,
       openAgentToolFlow,
       previewFileSelection,
@@ -451,7 +447,6 @@ function AgentToolFlowMessageList({
         }
       : undefined,
     assistantId: meta.agentId,
-    modelFallback: meta.modelFallback,
     isLoading: false,
     hasOlder: false,
     openAgentToolFlow: actions.openAgentToolFlow,
