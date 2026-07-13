@@ -314,6 +314,9 @@ function ShellMaximizedOverlay({ children }: { children: ReactNode }) {
   const useSharedSurface = Boolean(surface?.hostMounted && surface.root)
 
   return (
+    // On minimize, the live surface moves to the docked host immediately so heavyweight previews never remount or
+    // re-parse. The outgoing 180 ms overlay can therefore show only its background; that brief blank wipe is accepted.
+    // TODO(#16956): retain the surface through the exit and hand it to the docked slot without remounting.
     <AnimatePresence onExitComplete={actions.finishClose}>
       {state.open && state.maximized && (
         <motion.div
