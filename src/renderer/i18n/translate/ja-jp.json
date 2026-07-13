@@ -1846,6 +1846,11 @@
         "label": "トピック提示語",
         "tips": "トピック提示語：現在のトピックに対して追加の補足提示語を提供"
       },
+      "reorder": {
+        "error": {
+          "failed": "[to be translated]:Failed to reorder conversations"
+        }
+      },
       "search": {
         "placeholder": "トピックを検索...",
         "title": "検索"
@@ -6791,6 +6796,7 @@
           "confirm": "すべてのモデルをリストに追加しますか？",
           "label": "すべてのモデルを追加"
         },
+        "add_success_enable_failed": "[to be translated]:Models were added, but the provider could not be enabled.",
         "add_whole_group": "グループ全体を追加",
         "clean_stale_models": "無効なモデルをクリーンアップ",
         "clean_stale_success": "{{count}} 個の無効なモデルをクリーンアップしました",
@@ -7202,6 +7208,7 @@
         "fill_after_create": "認証フィールドは作成後に入力できます",
         "menu_label": "インスタンスを追加"
       },
+      "enable_failed_after_connection": "[to be translated]:Connection succeeded, but the provider could not be enabled.",
       "filter": {
         "agent": "エージェントサポート",
         "all": "すべてのプロバイダー",

@@ -510,7 +510,6 @@ describe('HistoryRecordsView agent mode', () => {
 
     expect(hookMocks.useSessions).toHaveBeenCalledWith(undefined, {
       enabled: true,
-      keepPreviousData: false,
       pageSize: 50,
       pinned: true,
       q: '',
@@ -519,7 +518,6 @@ describe('HistoryRecordsView agent mode', () => {
     })
     expect(hookMocks.useSessions).toHaveBeenCalledWith(undefined, {
       enabled: true,
-      keepPreviousData: false,
       pageSize: 50,
       pinned: false,
       q: '',

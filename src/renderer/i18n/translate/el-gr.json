@@ -1846,6 +1846,11 @@
         "label": "Προσδοκώμενα όρια",
         "tips": "Προσδοκώμενα όρια: προσθέτει επιπλέον επιστημονικές προσθήκες για το παρόν θέμα"
       },
+      "reorder": {
+        "error": {
+          "failed": "[to be translated]:Failed to reorder conversations"
+        }
+      },
       "search": {
         "placeholder": "Αναζήτηση θεμάτων...",
         "title": "Αναζήτηση"
@@ -6791,6 +6796,7 @@
           "confirm": "Είστε βέβαιοι ότι θέλετε να προσθέσετε όλα τα μοντέλα στη λίστα;",
           "label": "Προσθήκη όλων των μοντέλων"
         },
+        "add_success_enable_failed": "[to be translated]:Models were added, but the provider could not be enabled.",
         "add_whole_group": "Προσθήκη ολόκληρης ομάδας",
         "clean_stale_models": "Εκκαθάριση μη έγκυρων μοντέλων",
         "clean_stale_success": "Εκκαθαρίστηκαν {{count}} μη έγκυρα μοντέλα",
@@ -7202,6 +7208,7 @@
         "fill_after_create": "Τα πεδία πιστοποίησης μπορούν να συμπληρωθούν μετά τη δημιουργία",
         "menu_label": "Προσθήκη στιγμιότυπου"
       },
+      "enable_failed_after_connection": "[to be translated]:Connection succeeded, but the provider could not be enabled.",
       "filter": {
         "agent": "Υποστηριζόμενος από πράκτορα",
         "all": "Όλοι οι Πάροχοι",
