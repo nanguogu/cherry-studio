@@ -90,14 +90,26 @@ vi.mock('@dnd-kit/utilities', () => ({
   }
 }))
 
+const cursorGroupWindowMocks = vi.hoisted(() => ({
+  options: undefined as
+    | undefined
+    | {
+        fetchPage: (groupId: string, cursor?: string) => Promise<{ items: unknown[] }>
+        queryKey: string
+      }
+}))
+
 vi.mock('@renderer/hooks/useCursorGroupWindows', () => ({
-  useCursorGroupWindows: () => ({
-    items: [],
-    loadGroup: vi.fn().mockResolvedValue(null),
-    loadMoreGroup: vi.fn().mockResolvedValue(undefined),
-    reset: vi.fn(),
-    windows: {}
-  })
+  useCursorGroupWindows: (options: NonNullable<typeof cursorGroupWindowMocks.options>) => {
+    cursorGroupWindowMocks.options = options
+    return {
+      items: [],
+      loadGroup: vi.fn().mockResolvedValue(null),
+      loadMoreGroup: vi.fn().mockResolvedValue(undefined),
+      reset: vi.fn(),
+      windows: {}
+    }
+  }
 }))
 
 const notesSettingsMocks = vi.hoisted(() => ({
@@ -296,6 +308,11 @@ vi.mock('react-i18next', () => ({
       if (key === 'chat.topics.display.title') return 'Display mode'
       if (key === 'chat.topics.display.time') return 'Time'
       if (key === 'chat.topics.display.assistant') return 'Assistant'
+      if (key === 'common.list_options') return 'List options'
+      if (key === 'common.sort.title') return 'Sort order'
+      if (key === 'common.sort.created_at') return 'Creation time'
+      if (key === 'common.sort.manual_order') return 'Manual order'
+      if (key === 'common.sort.updated_at') return 'Updated time'
       if (key === 'chat.topics.group.unknown_assistant') return 'Unlinked Assistant'
       if (key === 'chat.topics.group.show_more') return 'Show more conversations'
       if (key === 'chat.topics.group.collapse') return 'Collapse conversations'
@@ -634,6 +651,16 @@ function clearTopicStreamCache(...topicIds: string[]) {
   }
 }
 
+function openTopicListOptions() {
+  fireEvent.click(screen.getByLabelText('List options'))
+  return screen.getByRole('menu')
+}
+
+function openTopicListSubmenu(menu: HTMLElement, label: string) {
+  const trigger = within(menu).getByRole('menuitem', { name: label })
+  fireEvent.keyDown(trigger, { key: 'Enter' })
+}
+
 describe('Topics', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -649,6 +676,7 @@ describe('Topics', () => {
     MockUsePreferenceUtils.setMultiplePreferenceValues({
       'assistant.icon_type': 'emoji',
       'assistant.tab.sort_type': 'list',
+      'topic.sort_type': 'createdAt',
       'topic.tab.display_mode': 'assistant',
       'topic.tab.position': 'left',
       'data.export.menus.docx': true,
@@ -791,6 +819,7 @@ describe('Topics', () => {
     dndMocks.onDragOver = undefined
     dndMocks.droppableData.clear()
     dndMocks.sortableData.clear()
+    cursorGroupWindowMocks.options = undefined
   })
 
   afterEach(() => {
@@ -834,6 +863,44 @@ describe('Topics', () => {
       '/topics',
       expect.objectContaining({ query: { pinned: false, sortBy: 'createdAt' }, limit: 50, enabled: true })
     )
+  })
+
+  it('passes the selected timestamp sort to both topic streams', () => {
+    MockUsePreferenceUtils.setPreferenceValue('topic.tab.display_mode' as never, 'time')
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'updatedAt')
+
+    renderTopicList()
+
+    expect(mockUseInfiniteQuery).toHaveBeenCalledWith(
+      '/topics',
+      expect.objectContaining({ query: { pinned: true, sortBy: 'updatedAt' }, limit: 50, enabled: true })
+    )
+    expect(mockUseInfiniteQuery).toHaveBeenCalledWith(
+      '/topics',
+      expect.objectContaining({ query: { pinned: false, sortBy: 'updatedAt' }, limit: 50, enabled: true })
+    )
+  })
+
+  it('includes topic sorting in grouped cursor requests and cache identity', async () => {
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'updatedAt')
+    const getSpy = vi.spyOn(dataApiService, 'get').mockResolvedValue({ items: [] } as never)
+
+    try {
+      renderTopicList()
+
+      expect(JSON.parse(cursorGroupWindowMocks.options?.queryKey ?? '{}')).toEqual(
+        expect.objectContaining({ sortBy: 'updatedAt' })
+      )
+      await cursorGroupWindowMocks.options?.fetchPage('topic:assistant:assistant-1')
+      expect(getSpy).toHaveBeenCalledWith(
+        '/topics',
+        expect.objectContaining({
+          query: expect.objectContaining({ assistantId: 'assistant-1', pinned: false, sortBy: 'updatedAt' })
+        })
+      )
+    } finally {
+      getSpy.mockRestore()
+    }
   })
 
   it('keeps a creation-stream retry available before any rows have loaded', async () => {
@@ -1040,14 +1107,14 @@ describe('Topics', () => {
     renderTopicList({ panePosition: 'right' })
 
     expect(screen.queryByRole('button', { name: 'Add Assistant' })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Display mode')).toBeInTheDocument()
+    expect(screen.getByLabelText('List options')).toBeInTheDocument()
   })
 
   it('uses only the redesigned search control in right panel mode', () => {
     renderTopicList({ assistantIdFilter: 'assistant-1', presentation: 'right-panel' })
 
     expect(screen.queryByRole('button', { name: 'chat.conversation.new' })).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Display mode')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('List options')).not.toBeInTheDocument()
 
     // Behavior: the right panel exposes the search control and drops the sidebar's new/display-mode
     // affordances. (Styling specifics intentionally not pinned here.)
@@ -2008,12 +2075,10 @@ describe('Topics', () => {
     expect(screen.getByText('Beta topic 1')).toBeInTheDocument()
     expect(getTopicGroupExpansionCache().assistant).not.toContain(TOPIC_ASSISTANT_SECTION_ID)
 
-    // The assistant header exposes history and bulk expand/collapse actions from the filter menu.
-    expect(screen.getByRole('button', { name: 'History' })).toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText('Display mode'))
-    const displayModeMenu = screen.getByText('Display mode').closest('[data-testid="menu-list"]')
-    expect(displayModeMenu).not.toBeNull()
-    fireEvent.click(within(displayModeMenu as HTMLElement).getByRole('button', { name: 'Collapse all' }))
+    // The assistant header exposes history and bulk expand/collapse actions from the options menu.
+    const optionsMenu = openTopicListOptions()
+    expect(within(optionsMenu).getByRole('menuitem', { name: 'History' })).toBeInTheDocument()
+    fireEvent.click(within(optionsMenu).getByRole('menuitem', { name: 'Collapse all' }))
 
     expect(getTopicGroupExpansionCache().assistant).toEqual([
       'topic:assistant:assistant-1',
@@ -2058,7 +2123,8 @@ describe('Topics', () => {
     expect(
       screen.queryAllByRole('button', { name: 'Assistant' }).some((button) => button.hasAttribute('aria-expanded'))
     ).toBe(false)
-    expect(screen.queryByRole('button', { name: 'Collapse all' })).not.toBeInTheDocument()
+    const optionsMenu = openTopicListOptions()
+    expect(within(optionsMenu).queryByRole('menuitem', { name: 'Collapse all' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Collapse conversations' })).toHaveTextContent('Collapse conversations')
   })
 
@@ -2110,31 +2176,54 @@ describe('Topics', () => {
     }
   })
 
-  it('renders the topic header display mode and history actions in the shared menu', async () => {
+  it('renders display and sort submenus before the existing topic list actions', async () => {
     const { onOpenHistoryRecords } = renderTopicList()
 
     expect(screen.getByTestId('resource-list-topic')).toBeInTheDocument()
     expect(screen.queryByPlaceholderText('Search conversations')).not.toBeInTheDocument()
 
     expect(screen.queryByLabelText('Manage topics')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText('Display mode'))
-    expect(screen.getByText('Display mode')).toBeInTheDocument()
-    const displayModeMenu = screen.getByText('Display mode').closest('[data-testid="menu-list"]')
-    expect(displayModeMenu).not.toBeNull()
-    expect(within(displayModeMenu as HTMLElement).getByRole('button', { name: 'Time' })).toBeInTheDocument()
-    expect(within(displayModeMenu as HTMLElement).getByRole('button', { name: 'Assistant' })).toBeInTheDocument()
-    expect(within(displayModeMenu as HTMLElement).getByRole('button', { name: 'History' })).toBeInTheDocument()
+    let optionsMenu = openTopicListOptions()
+    const rootItems = within(optionsMenu).getAllByRole('menuitem')
+    expect(rootItems[0]).toHaveTextContent('Display mode')
+    expect(rootItems[1]).toHaveTextContent('Sort order')
+    expect(within(optionsMenu).getByRole('menuitem', { name: 'History' })).toBeInTheDocument()
 
-    fireEvent.click(within(displayModeMenu as HTMLElement).getByRole('button', { name: 'Time' }))
+    openTopicListSubmenu(optionsMenu, 'Display mode')
+    expect(screen.getByRole('menuitemradio', { name: 'Conversation' })).toBeInTheDocument()
+    const selectedDisplayMode = screen.getByRole('menuitemradio', { name: 'Assistant' })
+    expect(selectedDisplayMode).toHaveAttribute('aria-checked', 'true')
+    expect(selectedDisplayMode.querySelector('.lucide-check')).toBeInTheDocument()
+    expect(selectedDisplayMode.querySelector('.lucide-circle')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('menuitemradio', { name: 'Conversation' }).querySelector('.lucide-check')
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Conversation' }))
     await vi.waitFor(() => {
       expect(MockUsePreferenceUtils.getPreferenceValue('topic.tab.display_mode' as never)).toBe('time')
     })
 
-    fireEvent.click(screen.getByLabelText('Display mode'))
-    const reopenedDisplayModeMenu = screen.getByText('Display mode').closest('[data-testid="menu-list"]')
-    expect(reopenedDisplayModeMenu).not.toBeNull()
-    fireEvent.click(within(reopenedDisplayModeMenu as HTMLElement).getByRole('button', { name: 'History' }))
+    optionsMenu = openTopicListOptions()
+    fireEvent.click(within(optionsMenu).getByRole('menuitem', { name: 'History' }))
     expect(onOpenHistoryRecords).toHaveBeenCalledTimes(1)
+  })
+
+  it('persists the selected topic sort independently from display mode', async () => {
+    renderTopicList()
+
+    const optionsMenu = openTopicListOptions()
+    openTopicListSubmenu(optionsMenu, 'Sort order')
+    const selectedSort = screen.getByRole('menuitemradio', { name: 'Creation time' })
+    expect(selectedSort).toHaveAttribute('aria-checked', 'true')
+    expect(selectedSort.querySelector('.lucide-check')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Updated time' }))
+
+    await vi.waitFor(() => {
+      expect(MockUsePreferenceUtils.getPreferenceValue('topic.sort_type' as never)).toBe('updatedAt')
+      expect(MockUsePreferenceUtils.getPreferenceValue('topic.tab.display_mode' as never)).toBe('assistant')
+    })
   })
 
   it('only expands the active assistant topic group when switching to assistant display mode from the menu', async () => {
@@ -2164,11 +2253,9 @@ describe('Topics', () => {
 
     renderTopicList()
 
-    fireEvent.click(screen.getByLabelText('Display mode'))
-    const displayModeMenu = screen.getByText('Display mode').closest('[data-testid="menu-list"]')
-    expect(displayModeMenu).not.toBeNull()
-
-    fireEvent.click(within(displayModeMenu as HTMLElement).getByRole('button', { name: 'Assistant' }))
+    const optionsMenu = openTopicListOptions()
+    openTopicListSubmenu(optionsMenu, 'Display mode')
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Assistant' }))
 
     await vi.waitFor(() => {
       expect(MockUsePreferenceUtils.getPreferenceValue('topic.tab.display_mode' as never)).toBe('assistant')
@@ -2770,11 +2857,8 @@ describe('Topics', () => {
     expect(screen.queryByRole('button', { name: 'Assistants' })).not.toBeInTheDocument()
     expect(getTopicRow('Alpha topic')).not.toHaveAttribute('data-selected')
 
-    fireEvent.click(screen.getByLabelText('Display mode'))
-    const displayModeMenu = screen.getByText('Display mode').closest('[data-testid="menu-list"]')
-    expect(displayModeMenu).not.toBeNull()
-
-    fireEvent.click(within(displayModeMenu as HTMLElement).getByRole('button', { name: 'Manage Assistants' }))
+    const optionsMenu = openTopicListOptions()
+    fireEvent.click(within(optionsMenu).getByRole('menuitem', { name: 'Manage Assistants' }))
 
     expect(onSelect).toHaveBeenCalledTimes(1)
   })
@@ -2905,6 +2989,16 @@ describe('Topics', () => {
       expect(patchSpy).toHaveBeenCalledWith('/assistants/assistant-1/order', { body: { after: 'assistant-2' } })
     )
     expect(patchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps assistant group drag but disables topic item drag for timestamp sorting', () => {
+    MockUsePreferenceUtils.setPreferenceValue('topic.tab.display_mode' as never, 'assistant')
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'updatedAt')
+
+    renderTopicList()
+
+    expect(dndMocks.sortableData.has('group:topic:assistant:assistant-1')).toBe(true)
+    expect(dndMocks.sortableData.has('item:topic-a')).toBe(false)
   })
 
   it('shows a toast when assistant group reorder persistence fails', async () => {
@@ -3128,6 +3222,7 @@ describe('Topics', () => {
   it('uses the drag rect fallback when dropping without a prior insertion line', async () => {
     const patchSpy = vi.spyOn(dataApiService, 'patch').mockResolvedValue(undefined as never)
     MockUsePreferenceUtils.setPreferenceValue('topic.tab.display_mode' as never, 'assistant')
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'orderKey')
 
     renderTopicList()
 
@@ -3157,6 +3252,7 @@ describe('Topics', () => {
   it('keeps multi-topic same-group drops at the fallback insertion index', async () => {
     const patchSpy = vi.spyOn(dataApiService, 'patch').mockResolvedValue(undefined as never)
     MockUsePreferenceUtils.setPreferenceValue('topic.tab.display_mode' as never, 'assistant')
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'orderKey')
     mockUseInfiniteQuery.mockReturnValue({
       pages: [
         {
@@ -3206,6 +3302,7 @@ describe('Topics', () => {
   it('keeps assistant grouped topics stable during cross-group drag hover', () => {
     const patchSpy = vi.spyOn(dataApiService, 'patch').mockResolvedValue(undefined as never)
     MockUsePreferenceUtils.setPreferenceValue('topic.tab.display_mode' as never, 'assistant')
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'orderKey')
 
     renderTopicList()
 
@@ -3230,6 +3327,7 @@ describe('Topics', () => {
   it('keeps assistant grouped topics stable during same-group drag hover', () => {
     const patchSpy = vi.spyOn(dataApiService, 'patch').mockResolvedValue(undefined as never)
     MockUsePreferenceUtils.setPreferenceValue('topic.tab.display_mode' as never, 'assistant')
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'orderKey')
 
     renderTopicList()
 
@@ -3254,6 +3352,7 @@ describe('Topics', () => {
   it('persists same-group drops using the last insertion line position', async () => {
     const patchSpy = vi.spyOn(dataApiService, 'patch').mockResolvedValue(undefined as never)
     MockUsePreferenceUtils.setPreferenceValue('topic.tab.display_mode' as never, 'assistant')
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'orderKey')
 
     renderTopicList()
 
@@ -3292,6 +3391,7 @@ describe('Topics', () => {
   it('moves topics across assistant groups before ordering them at the target position', async () => {
     const patchSpy = vi.spyOn(dataApiService, 'patch').mockResolvedValue(undefined as never)
     MockUsePreferenceUtils.setPreferenceValue('topic.tab.display_mode' as never, 'assistant')
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'orderKey')
 
     renderTopicList()
 
@@ -3326,6 +3426,7 @@ describe('Topics', () => {
       .mockResolvedValueOnce(undefined as never)
       .mockRejectedValueOnce(new Error('order failed'))
     MockUsePreferenceUtils.setPreferenceValue('topic.tab.display_mode' as never, 'assistant')
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'orderKey')
 
     renderTopicList()
 
@@ -3347,6 +3448,7 @@ describe('Topics', () => {
   it('does not drop topics into the unlinked assistant group for empty assistant ids', () => {
     const patchSpy = vi.spyOn(dataApiService, 'patch').mockResolvedValue(undefined as never)
     MockUsePreferenceUtils.setPreferenceValue('topic.tab.display_mode' as never, 'assistant')
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'orderKey')
     mockUseQuery.mockImplementation((path) => {
       if (path === '/pins') {
         return {
@@ -3420,6 +3522,7 @@ describe('Topics', () => {
   it('allows unlinked assistant topics to move into known assistant groups', async () => {
     const patchSpy = vi.spyOn(dataApiService, 'patch').mockResolvedValue(undefined as never)
     MockUsePreferenceUtils.setPreferenceValue('topic.tab.display_mode' as never, 'assistant')
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'orderKey')
     mockUseInfiniteQuery.mockReturnValue({
       pages: [
         {
@@ -3460,6 +3563,7 @@ describe('Topics', () => {
   it('does not drop topics into pinned or unlinked assistant groups', () => {
     const patchSpy = vi.spyOn(dataApiService, 'patch').mockResolvedValue(undefined as never)
     MockUsePreferenceUtils.setPreferenceValue('topic.tab.display_mode' as never, 'assistant')
+    MockUsePreferenceUtils.setPreferenceValue('topic.sort_type' as never, 'orderKey')
     mockUseInfiniteQuery.mockReturnValue({
       pages: [
         {

@@ -244,6 +244,7 @@ export function Topics({
     refreshTopics
   } = useTopicMutations()
   const [topicDisplayMode, setTopicDisplayMode] = usePreference('topic.tab.display_mode')
+  const [topicSortBy, setTopicSortBy] = usePreference('topic.sort_type')
   const [storedPanePosition, setStoredPanePosition] = usePreference('topic.tab.position')
   const [assistantIconType, setAssistantIconType] = usePreference('assistant.icon_type')
   const [assistantSortType, setAssistantSortType] = usePreference('assistant.tab.sort_type')
@@ -275,7 +276,6 @@ export function Topics({
   const displayMode = isRightPanel ? 'time' : (topicDisplayMode ?? 'time')
   const defaultGroupVisibleCount = displayMode === 'time' ? Number.POSITIVE_INFINITY : DEFAULT_TOPIC_GROUP_VISIBLE_COUNT
   const isAssistantDisplayMode = displayMode === 'assistant'
-  const topicSortBy = isAssistantDisplayMode ? 'orderKey' : 'createdAt'
   const [remoteQuery, setRemoteQuery] = useState('')
   const debouncedRemoteQuery = useDebouncedValue(remoteQuery, TOPIC_SEARCH_DEBOUNCE_MS)
   const isTopicListEnabled = !isRightPanel || assistantIdFilter !== undefined
@@ -302,7 +302,7 @@ export function Topics({
     pageSize: TOPIC_PAGE_SIZE,
     pinned: false,
     q: debouncedRemoteQuery,
-    sortBy: 'createdAt'
+    sortBy: topicSortBy
   })
   const {
     hasNext: hasMoreCreatedTopics,
@@ -513,12 +513,12 @@ export function Topics({
           limit: TOPIC_PAGE_SIZE,
           pinned: false,
           ...(debouncedRemoteQuery ? { q: debouncedRemoteQuery } : {}),
-          sortBy: 'orderKey'
+          sortBy: topicSortBy
         }
       })
       return { ...page, items: page.items.map(mapTopicListItem) }
     },
-    [debouncedRemoteQuery]
+    [debouncedRemoteQuery, topicSortBy]
   )
   const getRemoteTopicId = useCallback((topic: RemoteTopic) => topic.id, [])
   const {
@@ -534,7 +534,8 @@ export function Topics({
     queryKey: JSON.stringify({
       groups: orderedAssistantTopicGroupIds,
       ownerScope: rightPanelOwnerScope,
-      q: debouncedRemoteQuery
+      q: debouncedRemoteQuery,
+      sortBy: topicSortBy
     }),
     resourcePath: '/topics'
   })
@@ -924,9 +925,10 @@ export function Topics({
     () =>
       sortTopicsForDisplayGroups(topics, {
         assistantRankById,
-        mode: displayMode
+        mode: displayMode,
+        sortBy: topicSortBy
       }),
-    [assistantRankById, displayMode, topics]
+    [assistantRankById, displayMode, topicSortBy, topics]
   )
 
   const groupedTopics = useMemo(
@@ -1386,17 +1388,18 @@ export function Topics({
     [activeTopic, orderedAssistantTopicGroupIds, setTopicDisplayMode, setTopicExpansionAssistant]
   )
   const canDragTopicItem = useCallback(
-    ({ item }: { item: Topic }) => isAssistantDisplayMode && !item.pinned,
-    [isAssistantDisplayMode]
+    ({ item }: { item: Topic }) => isAssistantDisplayMode && topicSortBy === 'orderKey' && !item.pinned,
+    [isAssistantDisplayMode, topicSortBy]
   )
 
   const canDropTopicItem = useCallback(
     ({ targetGroupId }: { targetGroupId: string }) =>
       isAssistantDisplayMode &&
+      topicSortBy === 'orderKey' &&
       targetGroupId !== TOPIC_PINNED_GROUP_ID &&
       targetGroupId !== TOPIC_UNLINKED_ASSISTANT_GROUP_ID &&
       resolveAssistantIdForTopicGroup(targetGroupId, assistantById) !== undefined,
-    [assistantById, isAssistantDisplayMode]
+    [assistantById, isAssistantDisplayMode, topicSortBy]
   )
 
   const canDragTopicGroup = useCallback(
@@ -1481,6 +1484,8 @@ export function Topics({
         return
       }
 
+      if (topicSortBy !== 'orderKey') return
+
       if (payload.sourceGroupId === TOPIC_PINNED_GROUP_ID || payload.targetGroupId === TOPIC_PINNED_GROUP_ID) return
       if (payload.targetGroupId === TOPIC_UNLINKED_ASSISTANT_GROUP_ID) return
 
@@ -1505,7 +1510,7 @@ export function Topics({
         toast.error(formatErrorMessageWithPrefix(err, t('chat.topics.reorder.error.failed')))
       }
     },
-    [assistantById, isAssistantDisplayMode, orderedAssistants, refreshAssistants, refreshTopics, t, topics]
+    [assistantById, isAssistantDisplayMode, orderedAssistants, refreshAssistants, refreshTopics, t, topicSortBy, topics]
   )
   const canSetPanePosition = isAssistantDisplayMode || isRightPanel
 
@@ -1531,9 +1536,9 @@ export function Topics({
         groupHeaderClickBehavior={getGroupHeaderClickBehavior}
         dragCapabilities={{
           groups: isAssistantDisplayMode,
-          items: isAssistantDisplayMode,
-          itemSameGroup: isAssistantDisplayMode,
-          itemCrossGroup: isAssistantDisplayMode
+          items: isAssistantDisplayMode && topicSortBy === 'orderKey',
+          itemSameGroup: isAssistantDisplayMode && topicSortBy === 'orderKey',
+          itemCrossGroup: isAssistantDisplayMode && topicSortBy === 'orderKey'
         }}
         canDragGroup={canDragTopicGroup}
         canDropGroup={canDropTopicGroup}
@@ -1572,7 +1577,9 @@ export function Topics({
                       onChange={handleTopicDisplayModeChange}
                       onManageAssistants={manageAssistantsMenuItem?.onSelect}
                       onOpenHistoryRecords={onOpenHistoryRecords}
+                      onSortByChange={(nextSortBy) => void setTopicSortBy(nextSortBy)}
                       sectionId={isAssistantDisplayMode ? TOPIC_ASSISTANT_SECTION_ID : undefined}
+                      sortBy={topicSortBy}
                     />
                   </>
                 }
@@ -1586,7 +1593,9 @@ export function Topics({
               onChange={handleTopicDisplayModeChange}
               onManageAssistants={manageAssistantsMenuItem?.onSelect}
               onOpenHistoryRecords={onOpenHistoryRecords}
+              onSortByChange={(nextSortBy) => void setTopicSortBy(nextSortBy)}
               sectionId={TOPIC_ASSISTANT_SECTION_ID}
+              sortBy={topicSortBy}
             />
           )}
         </ResourceList.Header>

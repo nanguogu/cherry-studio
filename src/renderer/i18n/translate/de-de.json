@@ -371,7 +371,7 @@
       },
       "display": {
         "agent": "Agent",
-        "time": "Zeit",
+        "time": "Aufgabe",
         "title": "Anzeigemodus",
         "workdir": "Arbeitsverzeichnis"
       },
@@ -1740,7 +1740,7 @@
       "display": {
         "assistant": "Assistent",
         "tag": "Etikett",
-        "time": "Zeit",
+        "time": "Unterhaltung",
         "title": "Anzeigemodus"
       },
       "edit": {
@@ -2181,6 +2181,7 @@
     "invalid_value": "Ungültiger Wert",
     "knowledge_base": "Wissensdatenbank",
     "language": "Sprache",
+    "list_options": "[to be translated]:List options",
     "loading": "Lädt...",
     "maximize": "Maximieren",
     "minimize": "Minimieren",
@@ -2230,11 +2231,15 @@
     "sessions": "Sitzungen",
     "settings": "Einstellungen",
     "sort": {
+      "created_at": "[to be translated]:Creation time",
+      "manual_order": "[to be translated]:Manual order",
       "pinyin": {
         "asc": "Pinyin aufsteigend",
         "desc": "Pinyin absteigend",
         "label": "Nach Pinyin sortieren"
-      }
+      },
+      "title": "[to be translated]:Sort order",
+      "updated_at": "[to be translated]:Updated time"
     },
     "stop": "Stoppen",
     "subscribe": "Abonnieren",

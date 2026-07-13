@@ -376,7 +376,7 @@
       },
       "display": {
         "agent": "Agent",
-        "time": "Time",
+        "time": "Task",
         "title": "Display mode",
         "workdir": "Work directory"
       },
@@ -1745,7 +1745,7 @@
       "display": {
         "assistant": "Assistant",
         "tag": "Tag",
-        "time": "Time",
+        "time": "Conversation",
         "title": "Display mode"
       },
       "edit": {
@@ -2192,6 +2192,7 @@
     "invalid_value": "Invalid Value",
     "knowledge_base": "Knowledge Base",
     "language": "Language",
+    "list_options": "List options",
     "loading": "Loading...",
     "maximize": "Maximize",
     "minimize": "Minimize",
@@ -2241,11 +2242,15 @@
     "sessions": "Sessions",
     "settings": "Settings",
     "sort": {
+      "created_at": "Creation time",
+      "manual_order": "Manual order",
       "pinyin": {
         "asc": "Sort by Pinyin (A-Z)",
         "desc": "Sort by Pinyin (Z-A)",
         "label": "Sort by Pinyin"
-      }
+      },
+      "title": "Sort order",
+      "updated_at": "Updated time"
     },
     "stop": "Stop",
     "subscribe": "Subscribe",

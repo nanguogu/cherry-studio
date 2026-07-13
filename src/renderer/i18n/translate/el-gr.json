@@ -371,7 +371,7 @@
       },
       "display": {
         "agent": "Πράκτορας",
-        "time": "Χρόνος",
+        "time": "Εργασία",
         "title": "Λειτουργία προβολής",
         "workdir": "Κατάλογος εργασίας"
       },
@@ -1740,7 +1740,7 @@
       "display": {
         "assistant": "Βοηθός",
         "tag": "Ετικέτα",
-        "time": "Χρόνος",
+        "time": "Συνομιλία",
         "title": "Λειτουργία προβολής"
       },
       "edit": {
@@ -2181,6 +2181,7 @@
     "invalid_value": "Μη έγκυρη τιμή",
     "knowledge_base": "Βάση Γνώσεων",
     "language": "Γλώσσα",
+    "list_options": "[to be translated]:List options",
     "loading": "Φόρτωση...",
     "maximize": "Μεγιστοποίηση",
     "minimize": "Ελαχιστοποίηση",
@@ -2230,11 +2231,15 @@
     "sessions": "Συνεδρίες",
     "settings": "Ρυθμίσεις",
     "sort": {
+      "created_at": "[to be translated]:Creation time",
+      "manual_order": "[to be translated]:Manual order",
       "pinyin": {
         "asc": "Αύξουσα ταξινόμηση κατά Πινγίν",
         "desc": "Φθίνουσα ταξινόμηση κατά Πινγίν",
         "label": "Ταξινόμηση κατά Πινγίν"
-      }
+      },
+      "title": "[to be translated]:Sort order",
+      "updated_at": "[to be translated]:Updated time"
     },
     "stop": "σταματήστε",
     "subscribe": "Εγγραφείτε",
