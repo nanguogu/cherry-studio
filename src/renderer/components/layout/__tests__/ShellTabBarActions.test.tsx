@@ -8,7 +8,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const { mocks } = vi.hoisted(() => ({
   mocks: {
     openSettingsTab: vi.fn(),
-    showSearchPopup: vi.fn()
+    showSearchPopup: vi.fn(),
+    ipcRequest: vi.fn(),
+    quickAssistantEnabled: true,
+    showQuickAssistantInTabBar: true
   }
 }))
 
@@ -42,9 +45,14 @@ vi.mock('@cherrystudio/ui', () => ({
 
 vi.mock('@data/hooks/usePreference', () => ({
   usePreference: (key: string) => {
-    if (key === 'app.use_system_title_bar') return [false]
+    if (key === 'feature.quick_assistant.enabled') return [mocks.quickAssistantEnabled]
+    if (key === 'feature.quick_assistant.show_in_tab_bar') return [mocks.showQuickAssistantInTabBar]
     return [undefined]
   }
+}))
+
+vi.mock('@renderer/ipc', () => ({
+  ipcApi: { request: mocks.ipcRequest }
 }))
 
 vi.mock('@renderer/components/GlobalSearch/GlobalSearchPopup', () => ({
@@ -62,12 +70,14 @@ vi.mock('react-i18next', () => ({
     t: (key: string) =>
       ({
         'globalSearch.open': 'Open global search',
+        'quickAssistant.tooltip.open': 'Open Quick Assistant',
         'settings.title': 'Settings'
       })[key] ?? key
   })
 }))
 
 vi.mock('../../WindowControls', () => ({
+  useHasWindowControls: () => false,
   WindowControls: () => null
 }))
 
@@ -80,6 +90,8 @@ afterEach(() => {
 
 describe('ShellTabBarActions', () => {
   beforeEach(() => {
+    mocks.quickAssistantEnabled = true
+    mocks.showQuickAssistantInTabBar = true
     Object.defineProperty(window, 'toast', {
       configurable: true,
       value: { error: vi.fn() }
@@ -95,6 +107,39 @@ describe('ShellTabBarActions', () => {
 
     expect(screen.getByRole('button', { name: 'Open global search' })).toHaveAttribute('data-slot', 'button')
     expect(mocks.showSearchPopup).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the Quick Assistant action only when the feature and tab bar entry are enabled', () => {
+    const { rerender } = render(<ShellTabBarActions />)
+
+    expect(screen.getByRole('button', { name: 'Open Quick Assistant' })).toBeInTheDocument()
+
+    mocks.quickAssistantEnabled = false
+    rerender(<ShellTabBarActions />)
+
+    expect(screen.queryByRole('button', { name: 'Open Quick Assistant' })).not.toBeInTheDocument()
+
+    mocks.quickAssistantEnabled = true
+    mocks.showQuickAssistantInTabBar = false
+    rerender(<ShellTabBarActions />)
+
+    expect(screen.queryByRole('button', { name: 'Open Quick Assistant' })).not.toBeInTheDocument()
+  })
+
+  it('participates in the tab bar flex layout without absolute positioning', () => {
+    render(<ShellTabBarActions />)
+
+    expect(screen.getByTestId('shell-tab-bar-actions')).toHaveClass('shrink-0')
+    expect(screen.getByTestId('shell-tab-bar-actions')).not.toHaveClass('absolute')
+  })
+
+  it('shows the Quick Assistant without toggling it', async () => {
+    const user = userEvent.setup()
+
+    render(<ShellTabBarActions />)
+    await user.click(screen.getByRole('button', { name: 'Open Quick Assistant' }))
+
+    expect(mocks.ipcRequest).toHaveBeenCalledWith('quick_assistant.show')
   })
 
   it('keeps theme and settings actions out of the tab bar', () => {
