@@ -41,7 +41,7 @@ import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
 import type { ResourceListRevealPayload } from '@renderer/services/resourceListRevealEvents'
 import { toast } from '@renderer/services/toast'
 import { formatErrorMessageWithPrefix } from '@renderer/utils/error'
-import { findLatestUpdated, isUntouchedSinceCreation } from '@renderer/utils/resourceEntity'
+import { isUntouchedSinceCreation } from '@renderer/utils/resourceEntity'
 import { getDefaultRouteTitle } from '@renderer/utils/routeTitle'
 import { cn } from '@renderer/utils/style'
 import { getTabInstanceKey } from '@renderer/utils/tabInstanceMetadata'
@@ -170,10 +170,9 @@ const AgentPage = () => {
   const routeSessionId = routeSearch.sessionId
   const tabMetadataSessionId = currentTab ? getTabInstanceKey(currentTab, 'agents') : undefined
   const isMessageOnlyView = routeSearch.view === 'message' && !!routeSessionId
-  // Shared full-list source for the session UI and the composer reuse path. Reuse must read this
-  // upper-layer data instead of issuing a second ad-hoc full pagination request.
+  // Shared session facts plus bounded seed lookups for rails, restore, and placeholder reuse.
   const agentSessionsSource = useAgentSessionsSource({ enabled: !isMessageOnlyView })
-  const { sessions: agentSessions } = agentSessionsSource
+  const { stats: sessionStats, loadLatestSession, loadSessionSeedCandidates } = agentSessionsSource
   // First-entry selection resumes the most-recently-updated session. A dedicated `updatedAt DESC LIMIT 1`
   // query proves the global latest, so it neither waits for the full session history to paginate in nor
   // depends on the `orderKey`-paged `/agent-sessions` list order (which holds the newest-created, not the
@@ -428,15 +427,18 @@ const AgentPage = () => {
     [lastUsedWorkspaceId, setLastUsedWorkspaceId]
   )
 
-  const getSessionReuseCandidates = useCallback(() => {
-    const byId = new Map<string, AgentSessionEntity>()
+  const getSessionReuseCandidates = useCallback(
+    async (agentId: string) => {
+      const byId = new Map<string, AgentSessionEntity>()
 
-    for (const session of [pendingSelectedSession, visibleSession, ...agentSessions]) {
-      if (session?.id) byId.set(session.id, session)
-    }
+      for (const session of [pendingSelectedSession, visibleSession, ...(await loadSessionSeedCandidates(agentId))]) {
+        if (session?.id) byId.set(session.id, session)
+      }
 
-    return Array.from(byId.values())
-  }, [agentSessions, pendingSelectedSession, visibleSession])
+      return Array.from(byId.values())
+    },
+    [loadSessionSeedCandidates, pendingSelectedSession, visibleSession]
+  )
 
   const activateSession = useCallback(
     (session: AgentSessionEntity, fallbackAgentId?: string | null) => {
@@ -492,7 +494,7 @@ const AgentPage = () => {
         const workspaceSource = await resolveCreateWorkspaceSource(defaults, visibleSession)
         // Drop the session being replaced (post-delete): a stale candidate list still holds it, and
         // reusing it would reactivate the just-deleted session instead of opening a fresh one.
-        const reuseCandidates = getSessionReuseCandidates().filter(
+        const reuseCandidates = (await getSessionReuseCandidates(agentId)).filter(
           (candidate) => candidate.id !== defaults.excludeReuseSessionId
         )
         const reusableSessions = await findReusableEmptySessions(
@@ -609,7 +611,7 @@ const AgentPage = () => {
       try {
         // Reuse the agent's latest empty placeholder regardless of workspace — the picker resolves a
         // fresh workspace below only when it has to create one.
-        const reuseCandidates = getSessionReuseCandidates()
+        const reuseCandidates = await getSessionReuseCandidates(agentId)
         const reusableSessions = await findReusableEmptySessions(
           reuseCandidates,
           (candidate) => candidate.agentId === agentId
@@ -800,7 +802,7 @@ const AgentPage = () => {
   // correct even before the session cache refetches.
   const handleActiveAgentDeleted = useCallback(
     async (deletedAgentId: string) => {
-      const nextSession = findLatestUpdated(agentSessions.filter((session) => session.agentId !== deletedAgentId))
+      const nextSession = await loadLatestSession()
       if (nextSession) {
         setActiveSessionAndClearTransient(nextSession.id, nextSession)
         return
@@ -811,7 +813,7 @@ const AgentPage = () => {
         setActiveSessionId(null)
       }
     },
-    [agentSessions, createDefaultEmptySession, setActiveSessionAndClearTransient, setActiveSessionId]
+    [createDefaultEmptySession, loadLatestSession, setActiveSessionAndClearTransient, setActiveSessionId]
   )
   const replaceSessionWorkspace = useCallback(
     async (workspaceId: string | null) => {
@@ -849,11 +851,18 @@ const AgentPage = () => {
 
   // Classic layout = entity rail + right session panel; modern layout = the single sidebar (AgentSidePanel).
   const activeResourceAgentId = visibleSession?.agentId ?? null
+  const sessionCountByAgentId = useMemo(
+    () =>
+      new Map(
+        (sessionStats?.byAgent ?? []).flatMap(({ agentId, count }) => (agentId ? [[agentId, count] as const] : []))
+      ),
+    [sessionStats?.byAgent]
+  )
   const sessionResourcePaneCount: ResourcePaneCountButtonProps | undefined =
     isClassicSessionLayout && panePosition === 'right' && activeResourceAgentId
       ? {
           label: t('agent.session.list.title'),
-          count: agentSessions.filter((session) => session.agentId === activeResourceAgentId).length
+          count: sessionCountByAgentId.get(activeResourceAgentId) ?? 0
         }
       : undefined
   const setSessionListPosition = useCallback(
@@ -863,8 +872,8 @@ const AgentPage = () => {
         const activeAgentId = visibleSession?.agentId
         const collapsedAgentGroupIds = Array.from(
           new Set(
-            agentSessions
-              .map((session) => session.agentId)
+            (sessionStats?.byAgent ?? [])
+              .map(({ agentId }) => agentId)
               .filter((agentId): agentId is string => !!agentId && agentId !== activeAgentId)
               .map((agentId) => `session:agent:${agentId}`)
           )
@@ -876,12 +885,12 @@ const AgentPage = () => {
       setResourceListOpen(true)
     },
     [
-      agentSessions,
       setPanePosition,
       setResourceListOpen,
       setSessionDisplayMode,
       setSessionExpansionAgent,
       setSessionPaneOpen,
+      sessionStats?.byAgent,
       visibleSession?.agentId
     ]
   )
