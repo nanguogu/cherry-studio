@@ -317,8 +317,7 @@ export function Topics({
   const {
     stats: topicStats,
     isLoading: isTopicStatsLoading,
-    error: topicStatsError,
-    refetch: refetchTopicStats
+    error: topicStatsError
   } = useTopicStats({ enabled: isTopicListEnabled, query: topicStatsQuery })
   const { trigger: pinTopic, isLoading: isPinningTopic } = useMutation('POST', '/pins', {
     refresh: ['/pins', '/topics']
@@ -528,7 +527,6 @@ export function Topics({
     items: assistantWindowTopics,
     loadGroup: loadAssistantTopicGroup,
     loadMoreGroup: loadMoreAssistantTopicGroup,
-    reset: resetAssistantTopicWindows,
     windows: assistantTopicWindows
   } = useCursorGroupWindows<RemoteTopic>({
     enabled: isTopicListEnabled && isAssistantDisplayMode,
@@ -587,11 +585,8 @@ export function Topics({
       } else {
         await pinTopic({ body: { entityId: topicId, entityType: 'topic' } })
       }
-
-      resetAssistantTopicWindows()
-      await Promise.all([refetchPinnedTopics(), refetchCreatedTopics(), refetchTopicStats()])
     },
-    [pinTopic, refetchCreatedTopics, refetchPinnedTopics, refetchTopicStats, resetAssistantTopicWindows, unpinTopic]
+    [pinTopic, unpinTopic]
   )
 
   const { isFulfilled: isActiveTopicStreamFulfilled, markSeen: markActiveTopicStreamSeen } = useTopicStreamStatus(

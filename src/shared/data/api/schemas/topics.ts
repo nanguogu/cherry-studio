@@ -214,8 +214,8 @@ export type DeleteTopicsQuery = z.input<typeof DeleteTopicsQuerySchema>
  * Topic API Schema definitions.
  *
  * Reorder endpoints (`/topics/:id/order`, `/topics/order:batch`) are injected
- * via `& OrderEndpoints<'/topics'>`. The reorder operates on the whole-table
- * order; callers do not include any scope in the request body.
+ * via `& OrderEndpoints<'/topics'>`. The server scopes reorder operations by
+ * the topic's `groupId`; callers do not include that scope in the request body.
  */
 export type TopicSchemas = {
   /**

@@ -2500,7 +2500,7 @@ describe('Sessions', () => {
         params: { id: 'agent-a' }
       })
     )
-    expect(dataApiMocks.refetchAgents).toHaveBeenCalled()
+    expect(dataApiMocks.refetchAgents).not.toHaveBeenCalled()
   })
 
   it('opens a workspace group from the more menu without collapsing the group', async () => {
@@ -2683,8 +2683,8 @@ describe('Sessions', () => {
       'session-pinned',
       expect.objectContaining({ id: 'session-pinned' })
     )
-    expect(dataApiMocks.refetchWorkspaces).toHaveBeenCalled()
-    expect(sessionDataMocks.reload).toHaveBeenCalled()
+    expect(dataApiMocks.refetchWorkspaces).not.toHaveBeenCalled()
+    expect(sessionDataMocks.reload).not.toHaveBeenCalled()
   })
 
   it('creates sessions from workspace group actions', async () => {
@@ -2784,7 +2784,7 @@ describe('Sessions', () => {
     fireEvent.click(pinMenuItem as HTMLElement)
 
     await vi.waitFor(() => expect(toggleAgentPin).toHaveBeenCalledWith('agent-a'))
-    await vi.waitFor(() => expect(dataApiMocks.refetchAgents).toHaveBeenCalled())
+    expect(dataApiMocks.refetchAgents).not.toHaveBeenCalled()
 
     fireEvent.pointerDown(moreButton)
     const iconMenuItem = screen
@@ -2857,9 +2857,8 @@ describe('Sessions', () => {
     ])
     expect(sessionDataMocks.deleteSession).not.toHaveBeenCalled()
     expect(tabsContextMocks.closeConversationTabs).toHaveBeenCalledWith('agents', ['session-a'])
-    expect(onActiveAgentDeleted).toHaveBeenCalledWith('agent-a')
-    await vi.waitFor(() => expect(dataApiMocks.refetchAgents).toHaveBeenCalled())
-    await vi.waitFor(() => expect(sessionDataMocks.reload).toHaveBeenCalled())
+    expect(dataApiMocks.refetchAgents).not.toHaveBeenCalled()
+    expect(sessionDataMocks.reload).not.toHaveBeenCalled()
     expect(toast.success).toHaveBeenCalledWith('Deleted successfully')
   })
 
