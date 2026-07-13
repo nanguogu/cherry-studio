@@ -1,4 +1,5 @@
 import { cacheService } from '@renderer/data/CacheService'
+import { useSharedCache } from '@renderer/data/hooks/useCache'
 import { buildAgentSessionTopicId } from '@renderer/utils/agentSession'
 import { classifyTurn, type TopicStatusSnapshotEntry } from '@shared/ai/transport'
 import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react'
@@ -6,6 +7,11 @@ import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react'
 export type AgentSessionStreamState = {
   isPending: boolean
   status: TopicStatusSnapshotEntry['status']
+}
+
+export type AgentSessionHistoryStatusIds = {
+  activeIds: ReadonlySet<string>
+  failedIds: ReadonlySet<string>
 }
 
 const getAgentSessionStreamStatusCacheKey = (sessionId: string) =>
@@ -86,4 +92,21 @@ export function useAgentSessionStreamStatuses(
   )
 
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+}
+
+/**
+ * Main-owned, cross-window runtime index used by Agent History status filters.
+ * SharedCache is intentionally non-durable: after an app restart both sets are
+ * empty, so persisted sessions fall back to the completed History state. An id
+ * may briefly outlive a deleted SQLite row; History's bounded id lookup simply
+ * returns no row, making that stale entry harmless until a lifecycle update or
+ * app restart.
+ */
+export function useAgentSessionHistoryStatusIds(): AgentSessionHistoryStatusIds {
+  const [statusIds] = useSharedCache('agent.session.stream.status_ids')
+
+  return useMemo(
+    () => ({ activeIds: new Set(statusIds.activeIds), failedIds: new Set(statusIds.failedIds) }),
+    [statusIds]
+  )
 }
