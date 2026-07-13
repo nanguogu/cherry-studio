@@ -10,6 +10,7 @@ export {
 export { ResourcePaneCountButton, type ResourcePaneCountButtonProps } from './ResourcePaneCountButton'
 export {
   Shell,
+  type ShellTabShortcutOpenBehavior,
   useOptionalShellActions,
   useOptionalShellState,
   useShellActions,
