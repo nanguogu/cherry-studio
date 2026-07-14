@@ -6794,7 +6794,6 @@
           "confirm": "Tem a certeza de que deseja adicionar todos os modelos à lista?",
           "label": "Adicionar todos os modelos"
         },
-        "add_success_enable_failed": "[to be translated]:Models were added, but the provider could not be enabled.",
         "add_whole_group": "Adicionar todo o grupo",
         "clean_stale_models": "Limpar modelos obsoletos",
         "clean_stale_success": "{{count}} modelo(s) obsoleto(s) limpo(s)",
@@ -7206,7 +7205,6 @@
         "fill_after_create": "Os campos de autenticação podem ser preenchidos após a criação",
         "menu_label": "Adicionar instância"
       },
-      "enable_failed_after_connection": "[to be translated]:Connection succeeded, but the provider could not be enabled.",
       "filter": {
         "agent": "Suportado por Agente",
         "all": "Todos os Provedores",
