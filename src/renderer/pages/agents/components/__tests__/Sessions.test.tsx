@@ -291,7 +291,8 @@ const agentDataMocks = vi.hoisted(() => ({
 }))
 
 const pinMocks = vi.hoisted(() => ({
-  usePins: vi.fn()
+  usePins: vi.fn(),
+  usePinMutations: vi.fn(() => ({ pin: vi.fn(), unpin: vi.fn(), isMutating: false, error: undefined }))
 }))
 
 const preferenceMocks = vi.hoisted(() => ({
@@ -549,7 +550,8 @@ vi.mock('@renderer/data/hooks/useDataApi', () => ({
 }))
 
 vi.mock('@renderer/hooks/usePins', () => ({
-  usePins: pinMocks.usePins
+  usePins: pinMocks.usePins,
+  usePinMutations: pinMocks.usePinMutations
 }))
 
 vi.mock('@renderer/utils/agentSession', () => ({

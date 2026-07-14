@@ -2,7 +2,6 @@ import { Tooltip } from '@cherrystudio/ui'
 import { cacheService } from '@data/CacheService'
 import { dataApiService } from '@data/DataApiService'
 import { useCache, usePersistCache } from '@data/hooks/useCache'
-import { useMutation } from '@data/hooks/useDataApi'
 import { useMultiplePreferences, usePreference } from '@data/hooks/usePreference'
 import { loggerService } from '@logger'
 import { actionsToCommandMenuExtraItems } from '@renderer/components/chat/actions/actionMenuItems'
@@ -45,7 +44,7 @@ import { useCursorGroupWindows } from '@renderer/hooks/useCursorGroupWindows'
 import { useDebouncedValue } from '@renderer/hooks/useDebouncedValue'
 import { useImageCaptureTargets } from '@renderer/hooks/useImageCaptureTargets'
 import { useNotesSettings } from '@renderer/hooks/useNotesSettings'
-import { usePins } from '@renderer/hooks/usePins'
+import { usePinMutations, usePins } from '@renderer/hooks/usePins'
 import {
   finishTopicRenaming,
   getTopicMessages,
@@ -317,13 +316,7 @@ export function Topics({
     isLoading: isTopicStatsLoading,
     error: topicStatsError
   } = useTopicStats({ enabled: isTopicListEnabled, query: topicStatsQuery })
-  const { trigger: pinTopic, isLoading: isPinningTopic } = useMutation('POST', '/pins', {
-    refresh: ['/pins', { path: '/topics', strategy: 'reset-cursor' }, '/topics/stats']
-  })
-  const { trigger: unpinTopic, isLoading: isUnpinningTopic } = useMutation('DELETE', '/pins/:id', {
-    refresh: ['/pins', { path: '/topics', strategy: 'reset-cursor' }, '/topics/stats']
-  })
-  const isPinsMutating = isPinningTopic || isUnpinningTopic
+  const { pin: pinTopic, unpin: unpinTopic, isMutating: isPinsMutating } = usePinMutations('topic')
   const {
     isLoading: isAssistantPinsLoading,
     isMutating: isAssistantPinsMutating,
@@ -550,9 +543,9 @@ export function Topics({
   const commitTopicPin = useCallback(
     async (topic: RemoteTopic) => {
       if (topic.pinId) {
-        await unpinTopic({ params: { id: topic.pinId } })
+        await unpinTopic(topic.pinId)
       } else {
-        await pinTopic({ body: { entityId: topic.id, entityType: 'topic' } })
+        await pinTopic(topic.id)
       }
     },
     [pinTopic, unpinTopic]
