@@ -138,6 +138,10 @@ describe('ClaudeCodeRuntimeDriver', () => {
     mocks.consumeWarmQuery.mockResolvedValue(undefined)
     mocks.prepareTrace.mockResolvedValue(undefined)
     mocks.buildRequest.mockResolvedValue({
+      connectionConfig: {
+        rebuildSignature: 'sig-1',
+        live: { toolPolicy: { permissionMode: null, disabledTools: [], mcps: [] } }
+      },
       key: 'warm-key',
       options: { model: 'sonnet' },
       settings: {},
@@ -401,7 +405,9 @@ describe('ClaudeCodeRuntimeDriver', () => {
     function makeSnapshot(initialMode: string | undefined) {
       let mode = initialMode
       return {
-        update: vi.fn().mockResolvedValue(undefined),
+        update: vi.fn(async (agent: any) => {
+          mode = agent.configuration?.permission_mode
+        }),
         getPermissionMode: vi.fn(() => mode),
         setPermissionMode: vi.fn((next: string | undefined) => {
           mode = next
@@ -411,6 +417,7 @@ describe('ClaudeCodeRuntimeDriver', () => {
 
     async function connectWith(snapshot: ReturnType<typeof makeSnapshot>, setPermissionMode: any) {
       mocks.buildRequest.mockResolvedValueOnce({
+        connectionConfig: desiredPolicy(snapshot.getPermissionMode() ?? null).config,
         key: 'warm-key',
         options: { model: 'sonnet' },
         settings: { toolPolicySnapshot: snapshot },
@@ -439,10 +446,11 @@ describe('ClaudeCodeRuntimeDriver', () => {
 
     it('awaits the SDK call before mutating the snapshot', async () => {
       const snapshot = makeSnapshot('default')
-      // Assert the snapshot is untouched at the moment the SDK call runs — the applier must mutate
-      // it only AFTER awaiting the SDK round-trip.
+      const updatedAgent = { id: 'agent-1', configuration: { permission_mode: 'acceptEdits' } }
+      mocks.getAgent.mockReturnValue(updatedAgent)
       const setPermissionMode = vi.fn().mockImplementation(async () => {
-        expect(snapshot.setPermissionMode).not.toHaveBeenCalled()
+        expect(snapshot.update).not.toHaveBeenCalled()
+        expect(snapshot.getPermissionMode()).toBe('default')
       })
       const connection = await connectWith(snapshot, setPermissionMode)
 
@@ -450,13 +458,16 @@ describe('ClaudeCodeRuntimeDriver', () => {
       await expect(connection.reconcile({ modelId: 'claude-code::sonnet' as any })).resolves.toBe('patched')
 
       expect(setPermissionMode).toHaveBeenCalledWith('acceptEdits')
-      expect(snapshot.setPermissionMode).toHaveBeenCalledWith('acceptEdits')
+      expect(snapshot.update).toHaveBeenCalledWith(updatedAgent)
+      expect(snapshot.getPermissionMode()).toBe('acceptEdits')
+      expect(setPermissionMode.mock.invocationCallOrder[0]).toBeLessThan(snapshot.update.mock.invocationCallOrder[0])
 
       void connection.close()
     })
 
     it('does NOT mutate the snapshot when the SDK setPermissionMode rejects', async () => {
       const snapshot = makeSnapshot('default')
+      mocks.getAgent.mockReturnValue({ id: 'agent-1', configuration: { permission_mode: 'acceptEdits' } })
       const setPermissionMode = vi.fn().mockRejectedValue(new Error('SDK refused'))
       const connection = await connectWith(snapshot, setPermissionMode)
 
@@ -464,7 +475,8 @@ describe('ClaudeCodeRuntimeDriver', () => {
       await expect(connection.reconcile({ modelId: 'claude-code::sonnet' as any })).resolves.toBe('failed')
       // Fail-closed: the snapshot (which gates canUseTool) keeps the old mode the running query
       // never moved off of — it must NOT be advanced to the unconfirmed tighten/loosen.
-      expect(snapshot.setPermissionMode).not.toHaveBeenCalled()
+      expect(snapshot.update).not.toHaveBeenCalled()
+      expect(snapshot.getPermissionMode()).toBe('default')
 
       void connection.close()
     })
@@ -886,6 +898,7 @@ describe('ClaudeCodeRuntimeDriver', () => {
       }
       mocks.createClaudeQuery.mockReturnValue(query)
       mocks.buildRequest.mockResolvedValue({
+        connectionConfig: makeConfig({}).config,
         key: 'warm-key',
         options: { model: 'sonnet' },
         settings: { toolPolicySnapshot },
@@ -914,7 +927,9 @@ describe('ClaudeCodeRuntimeDriver', () => {
       // SDK first, snapshot second — the fail-closed ordering applyPolicyUpdate established.
       expect(toolPolicySnapshot.update).toHaveBeenCalled()
       expect(query.setPermissionMode).toHaveBeenCalledWith('acceptEdits')
-      expect(toolPolicySnapshot.setPermissionMode).toHaveBeenCalledWith('acceptEdits')
+      expect(query.setPermissionMode.mock.invocationCallOrder[0]).toBeLessThan(
+        toolPolicySnapshot.update.mock.invocationCallOrder[0]
+      )
 
       // Baseline advanced: the same desired config is now 'current', not re-patched.
       query.setPermissionMode.mockClear()
@@ -941,7 +956,35 @@ describe('ClaudeCodeRuntimeDriver', () => {
 
       await expect(connection.reconcile({ modelId: 'claude-code::sonnet' as any })).resolves.toBe('failed')
       // Snapshot untouched — mutating it before SDK confirmation would fork local policy.
-      expect(toolPolicySnapshot.setPermissionMode).not.toHaveBeenCalled()
+      expect(toolPolicySnapshot.update).not.toHaveBeenCalled()
+    })
+
+    it('compares against the materialized request baseline when configuration changes during connect', async () => {
+      mocks.buildRequest.mockResolvedValue({
+        connectionConfig: makeConfig({ signature: 'materialized-sig' }).config,
+        key: 'warm-key',
+        options: { model: 'sonnet' },
+        settings: {},
+        sdkModelId: 'sonnet-sdk'
+      })
+      const queryQueue = createAsyncQueue<any>()
+      mocks.createClaudeQuery.mockReturnValue({
+        ...queryQueue.iterable,
+        interrupt: vi.fn(),
+        close: vi.fn(),
+        setPermissionMode: vi.fn()
+      })
+      mocks.deriveConfig.mockResolvedValue(makeConfig({ signature: 'edited-during-connect' }))
+
+      const connection = await new ClaudeCodeRuntimeDriver().connect({
+        sessionId: 'session-1',
+        agentId: 'agent-1',
+        modelId: 'claude-code::sonnet' as any
+      })
+
+      expect(mocks.deriveConfig).not.toHaveBeenCalled()
+      await expect(connection.reconcile({ modelId: 'claude-code::sonnet' as any })).resolves.toBe('rebuild')
+      expect(mocks.deriveConfig).toHaveBeenCalledTimes(1)
     })
 
     it('returns invalid when the desired config can no longer be derived', async () => {
