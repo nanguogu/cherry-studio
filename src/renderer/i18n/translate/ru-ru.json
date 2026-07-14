@@ -2621,8 +2621,6 @@
       "filter": {
         "selectAgent": "Выберите агента",
         "selectAssistant": "Выберите ассистента",
-        "statusLabel": "Статус",
-        "statusPlaceholder": "Выберите статус",
         "unlinkedAssistant": "Несвязанный ассистент"
       },
       "loading": {
@@ -2634,11 +2632,6 @@
       "searchSession": "Поиск задач...",
       "searchTopic": "Поиск бесед...",
       "shortTitle": "История",
-      "status": {
-        "completed": "Завершено",
-        "failed": "Не удалось",
-        "running": "Бег"
-      },
       "table": {
         "actions": "Действия",
         "conversation": "Разговор",

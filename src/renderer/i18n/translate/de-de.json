@@ -2621,8 +2621,6 @@
       "filter": {
         "selectAgent": "Agent auswählen",
         "selectAssistant": "Assistent auswählen",
-        "statusLabel": "Status",
-        "statusPlaceholder": "Status auswählen",
         "unlinkedAssistant": "Unverknüpfter Assistent"
       },
       "loading": {
@@ -2634,11 +2632,6 @@
       "searchSession": "Aufgaben suchen...",
       "searchTopic": "Unterhaltungen durchsuchen...",
       "shortTitle": "Geschichte",
-      "status": {
-        "completed": "Abgeschlossen",
-        "failed": "Fehlgeschlagen",
-        "running": "Laufen"
-      },
       "table": {
         "actions": "Aktionen",
         "conversation": "Unterhaltung",

@@ -2621,8 +2621,6 @@
       "filter": {
         "selectAgent": "Selecionar um agente",
         "selectAssistant": "Selecionar um assistente",
-        "statusLabel": "Estado",
-        "statusPlaceholder": "Selecionar estado",
         "unlinkedAssistant": "Assistente desvinculado"
       },
       "loading": {
@@ -2634,11 +2632,6 @@
       "searchSession": "Pesquisar tarefas...",
       "searchTopic": "Pesquisar conversas...",
       "shortTitle": "História",
-      "status": {
-        "completed": "Concluído",
-        "failed": "Falhou",
-        "running": "Correndo"
-      },
       "table": {
         "actions": "Ações",
         "conversation": "Conversa",
