@@ -233,7 +233,8 @@ export function useChatRuntimeState({
       mentionedModelIds: options?.mentionedModels,
       knowledgeBaseIds: options?.knowledgeBaseIds
     }),
-    refreshMetadata: ({ topicId }) => invalidateCache(['/topics', `/topics/${topicId}`])
+    refreshMetadata: ({ topicId }) =>
+      invalidateCache([{ path: '/topics', strategy: 'reset-cursor' }, `/topics/${topicId}`])
   })
 
   const activeStreamingMessageIds = useMemo(
